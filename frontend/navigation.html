@@ -1,4 +1,5 @@
 <!-- Navigation Component -->
+<script src="local-storage.js"></script>
 <nav class="fixed top-0 left-0 right-0 bg-gradient-to-r from-blue-900 to-purple-900 shadow-lg z-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between h-16">
@@ -17,10 +18,8 @@
             </div>
             <div class="hidden md:block">
                 <div class="ml-4 flex items-center md:ml-6">
-                    <div class="relative">
-                        <button onclick="logout()" class="text-white hover:bg-white/20 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                            Logout
-                        </button>
+                    <div class="relative" id="userMenu">
+                        <!-- User menu will be populated by JavaScript -->
                     </div>
                 </div>
             </div>
@@ -40,7 +39,9 @@
             <a href="/forecasting" class="text-white hover:bg-white/20 block px-3 py-2 rounded-md text-base font-medium">Forecasting</a>
             <a href="/multigrid" class="text-white hover:bg-white/20 block px-3 py-2 rounded-md text-base font-medium">Multi-Grid</a>
             <a href="/setup" class="text-white hover:bg-white/20 block px-3 py-2 rounded-md text-base font-medium">Setup</a>
-            <button onclick="logout()" class="text-white hover:bg-white/20 block w-full text-left px-3 py-2 rounded-md text-base font-medium">Logout</button>
+            <div id="mobileUserMenu">
+                <!-- Mobile user menu will be populated by JavaScript -->
+            </div>
         </div>
     </div>
 </nav>
@@ -51,23 +52,97 @@
         menu.classList.toggle('hidden');
     }
 
-    async function logout() {
-        try {
-            const response = await fetch('/logout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-            
-            if (response.ok) {
-                window.location.href = '/';
-            } else {
-                console.error('Logout failed');
-            }
-        } catch (error) {
-            console.error('Logout error:', error);
+    function updateUserMenu() {
+        const userData = getUserData();
+        const isGuest = isGuestUser();
+        const userMenu = document.getElementById('userMenu');
+        const mobileUserMenu = document.getElementById('mobileUserMenu');
+
+        if (isGuest) {
+            // Guest user menu
+            userMenu.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="text-right">
+                        <div class="text-white text-sm font-medium">Guest User</div>
+                        <div class="text-gray-300 text-xs">Local data only</div>
+                    </div>
+                    <div class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white font-bold">?</div>
+                    <button onclick="clearGuestDataAndLogout()" class="text-white hover:bg-white/20 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        Clear Data
+                    </button>
+                    <button onclick="showLoginModal()" class="text-white hover:bg-white/20 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        Sign In
+                    </button>
+                </div>
+            `;
+            mobileUserMenu.innerHTML = `
+                <div class="border-t border-gray-600 pt-2 mt-2">
+                    <div class="text-gray-300 text-sm px-3 py-1">Guest User</div>
+                    <button onclick="clearGuestDataAndLogout()" class="text-white hover:bg-white/20 block w-full text-left px-3 py-2 rounded-md text-base font-medium">Clear Local Data</button>
+                    <button onclick="showLoginModal()" class="text-white hover:bg-white/20 block w-full text-left px-3 py-2 rounded-md text-base font-medium">Sign In</button>
+                </div>
+            `;
+        } else {
+            // Logged-in user menu
+            const userName = userData ? userData.name : 'User';
+            const userEmail = userData ? userData.email : '';
+            userMenu.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="text-right">
+                        <div class="text-white text-sm font-medium">${userName}</div>
+                        <div class="text-gray-300 text-xs">${userEmail}</div>
+                    </div>
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style="background: var(--copper);">
+                        ${userName.charAt(0).toUpperCase()}
+                    </div>
+                    <button onclick="logout()" class="text-white hover:bg-white/20 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                        Logout
+                    </button>
+                </div>
+            `;
+            mobileUserMenu.innerHTML = `
+                <div class="border-t border-gray-600 pt-2 mt-2">
+                    <div class="text-gray-300 text-sm px-3 py-1">${userName}</div>
+                    <button onclick="logout()" class="text-white hover:bg-white/20 block w-full text-left px-3 py-2 rounded-md text-base font-medium">Logout</button>
+                </div>
+            `;
+        }
+    }
+
+    function clearGuestDataAndLogout() {
+        if (confirm('This will clear all your local data. Are you sure?')) {
+            clearGuestData();
             window.location.href = '/';
         }
     }
+
+    function showLoginModal() {
+        window.location.href = '/';
+    }
+
+    async function logout() {
+        try {
+            // Clear localStorage data
+            clearAllData();
+            
+            // Call backend logout if logged in
+            if (!isGuestUser()) {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+            }
+            
+            window.location.href = '/';
+        } catch (error) {
+            console.error('Logout error:', error);
+            clearAllData();
+            window.location.href = '/';
+        }
+    }
+
+    // Update menu on page load
+    document.addEventListener('DOMContentLoaded', updateUserMenu);
 </script>

@@ -61,43 +61,38 @@ def login_page():
 
 
 @app.route("/setup")
-@login_required
 def setup_page():
+    """Serve the setup page - no login required for guest users"""
     return send_from_directory(str(FRONTEND_DIR), "setup.html")
 
 
 @app.route("/forecasting")
-@login_required
 def forecasting_page():
-    """Serve the forecasting page"""
+    """Serve the forecasting page - no login required for guest users"""
     return send_from_directory(str(FRONTEND_DIR), "forecasting.html")
 
 
 @app.route("/dashboard")
-@login_required
 def dashboard():
-    """Serve the dashboard page"""
+    """Serve the dashboard page - no login required for guest users"""
     return send_from_directory(str(FRONTEND_DIR), "dashboard.html")
 
 
 @app.route("/forecasting")
-@login_required
 def forecasting():
-    """Serve the forecasting page"""
+    """Serve the forecasting page - no login required for guest users"""
     return send_from_directory(str(FRONTEND_DIR), "forecasting.html")
 
 
 @app.route("/multigrid")
-@login_required
 def multigrid():
-    """Serve the multigrid page"""
+    """Serve the multigrid page - no login required for guest users"""
     return send_from_directory(str(FRONTEND_DIR), "multigrid.html")
 
 
 @app.route("/navigation.html")
-@login_required
 def navigation():
-    """Serve the navigation component"""
+    """Serve the navigation component - no login required for guest users"""
     return send_from_directory(str(FRONTEND_DIR), "navigation.html")
 
 
@@ -160,36 +155,54 @@ def login():
         return jsonify({"error": f"Login failed: {str(e)}"}), 500
 
 @app.route("/logout", methods=["POST"])
-@login_required
 def logout():
-    """User logout endpoint"""
+    """User logout endpoint - works for both logged-in and guest users"""
     try:
-        logout_user_session()
+        if current_user.is_authenticated:
+            logout_user_session()
         return jsonify({"status": "success", "message": "Logout successful"})
     except Exception as e:
         return jsonify({"error": f"Logout failed: {str(e)}"}), 500
 
 @app.route("/api/user/profile")
-@login_required
 def get_user_profile():
-    """Get current user profile"""
+    """Get current user profile - works for both logged-in and guest users"""
     try:
-        return jsonify({
-            "status": "success",
-            "user": current_user.to_dict()
-        })
+        if current_user.is_authenticated:
+            return jsonify({
+                "status": "success",
+                "user": current_user.to_dict()
+            })
+        else:
+            # For guest users, return guest profile
+            return jsonify({
+                "status": "success",
+                "user": {
+                    "name": "Guest User",
+                    "email": "guest@local",
+                    "is_guest": True
+                }
+            })
     except Exception as e:
         return jsonify({"error": f"Failed to get profile: {str(e)}"}), 500
 
 @app.route("/api/user/configurations")
 def get_user_configurations():
-    """Get user's system configurations"""
+    """Get user's system configurations - works for both logged-in and guest users"""
     try:
-        configurations = SystemConfiguration.query.filter_by(user_id=current_user.id).all()
-        return jsonify({
-            "status": "success",
-            "configurations": [config.to_dict() for config in configurations]
-        })
+        if current_user.is_authenticated:
+            configurations = SystemConfiguration.query.filter_by(user_id=current_user.id).all()
+            return jsonify({
+                "status": "success",
+                "configurations": [config.to_dict() for config in configurations]
+            })
+        else:
+            # For guest users, return empty list (frontend will use localStorage)
+            return jsonify({
+                "status": "success",
+                "configurations": [],
+                "is_guest": True
+            })
     except Exception as e:
         return jsonify({"error": f"Failed to get configurations: {str(e)}"}), 500
 
@@ -334,27 +347,33 @@ def calculate_model_accuracy():
 # -----------------------------
 
 @app.route("/submit_setup", methods=["POST"])
-@login_required
 def submit_setup():
-    """Save system configuration for current user"""
+    """Save system configuration - works for both logged-in and guest users"""
     try:
         config = request.json
         print(f"DEBUG: Setup data received: {config}")  # Fix 3: Log setup data for debugging
         print(f"DEBUG: Solar panel_power in setup: {config.get('solar', {}).get('panel_power')}")  # Fix 3: Check panel_power
         
-        # Save configuration to database
-        system_config = SystemConfiguration(
-            user_id=current_user.id,
-            name=f"Configuration {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            config_data=json.dumps(config),
-            is_active=True
-        )
-        
-        # Deactivate previous configurations
-        SystemConfiguration.query.filter_by(user_id=current_user.id).update({'is_active': False})
-        
-        db.session.add(system_config)
-        db.session.commit()
+        # Check if user is logged in
+        if current_user.is_authenticated:
+            # Save configuration to database for logged-in users
+            system_config = SystemConfiguration(
+                user_id=current_user.id,
+                name=f"Configuration {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                config_data=json.dumps(config),
+                is_active=True
+            )
+            
+            # Deactivate previous configurations
+            SystemConfiguration.query.filter_by(user_id=current_user.id).update({'is_active': False})
+            
+            db.session.add(system_config)
+            db.session.commit()
+            
+            config_id = system_config.id
+        else:
+            # For guest users, just return success (data is handled in localStorage)
+            config_id = None
         
         # Train Prophet models and generate forecast in background
         try:
@@ -366,7 +385,7 @@ def submit_setup():
             return jsonify({
                 "status": "success", 
                 "message": "Setup saved, Prophet models trained, and forecast generated",
-                "config_id": system_config.id
+                "config_id": config_id
             })
         except Exception as e:
             print(f"Error during model training/forecast: {e}")
@@ -374,38 +393,44 @@ def submit_setup():
             return jsonify({
                 "status": "success", 
                 "message": f"Setup saved. Model training may have failed: {str(e)}",
-                "config_id": system_config.id
+                "config_id": config_id
             })
             
     except Exception as e:
         return jsonify({"error": f"Failed to save setup: {str(e)}"}), 500
 
 @app.route("/save_setup", methods=["POST"])
-@login_required
 def save_setup():
-    """Save system configuration without forecast generation"""
+    """Save system configuration without forecast generation - works for both logged-in and guest users"""
     try:
         config = request.json
         
-        # Save configuration to database
-        system_config = SystemConfiguration(
-            user_id=current_user.id,
-            name=f"Configuration {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-            config_data=json.dumps(config),
-            is_active=True
-        )
-        
-        # Deactivate previous configurations
-        SystemConfiguration.query.filter_by(user_id=current_user.id).update({'is_active': False})
-        
-        db.session.add(system_config)
-        db.session.commit()
+        # Check if user is logged in
+        if current_user.is_authenticated:
+            # Save configuration to database for logged-in users
+            system_config = SystemConfiguration(
+                user_id=current_user.id,
+                name=f"Configuration {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                config_data=json.dumps(config),
+                is_active=True
+            )
+            
+            # Deactivate previous configurations
+            SystemConfiguration.query.filter_by(user_id=current_user.id).update({'is_active': False})
+            
+            db.session.add(system_config)
+            db.session.commit()
+            
+            config_id = system_config.id
+        else:
+            # For guest users, just return success (data is handled in localStorage)
+            config_id = None
         
         generate_forecast(config)
         
         return jsonify({
             "status": "forecast_generated",
-            "config_id": system_config.id
+            "config_id": config_id
         })
         
     except Exception as e:
@@ -413,20 +438,29 @@ def save_setup():
 
 @app.route("/api/setup/active")
 def get_active_setup():
-    """Get user's active configuration"""
+    """Get user's active configuration - works for both logged-in and guest users"""
     try:
-        active_config = SystemConfiguration.query.filter_by(
-            user_id=current_user.id, 
-            is_active=True
-        ).first()
-        
-        if active_config:
+        # Check if user is logged in
+        if current_user.is_authenticated:
+            active_config = SystemConfiguration.query.filter_by(
+                user_id=current_user.id, 
+                is_active=True
+            ).first()
+            
+            if active_config:
+                return jsonify({
+                    "status": "success",
+                    "configuration": active_config.to_dict()
+                })
+            else:
+                return jsonify({"error": "No active configuration found"}), 404
+        else:
+            # For guest users, return empty config (frontend will use localStorage)
             return jsonify({
                 "status": "success",
-                "configuration": active_config.to_dict()
+                "configuration": None,
+                "is_guest": True
             })
-        else:
-            return jsonify({"error": "No active configuration found"}), 404
             
     except Exception as e:
         return jsonify({"error": f"Failed to get configuration: {str(e)}"}), 400
@@ -437,9 +471,8 @@ def get_active_setup():
 # -----------------------------
 
 @app.route("/forecast_sample")
-@login_required
 def get_sample_forecast():
-    """Get sample forecast data for demonstration"""
+    """Get sample forecast data for demonstration - no login required"""
     try:
         print("Generating sample forecast data...")
         
@@ -721,20 +754,20 @@ def get_model_status():
 # -----------------------------
 
 @app.route("/train_prophet", methods=["POST"])
-@login_required
 def train_prophet():
-    """Train Prophet AI model for energy forecasting"""
+    """Train Prophet AI model for energy forecasting - no login required"""
     try:
         print("Starting Prophet model training...")
         
-        # Get user's active configuration
-        active_config = SystemConfiguration.query.filter_by(
-            user_id=current_user.id, 
-            is_active=True
-        ).first()
-        
-        if not active_config:
-            return jsonify({"error": "No active configuration found. Please complete setup first."}), 400
+        # Check if user is logged in and has active configuration
+        if current_user.is_authenticated:
+            active_config = SystemConfiguration.query.filter_by(
+                user_id=current_user.id, 
+                is_active=True
+            ).first()
+            
+            if not active_config:
+                return jsonify({"error": "No active configuration found. Please complete setup first."}), 400
         
         # Train the Prophet model
         train_prophet_model()
@@ -750,9 +783,8 @@ def train_prophet():
         return jsonify({"error": f"Failed to train model: {str(e)}"}), 500
 
 @app.route("/forecast_prophet", methods=["GET"])
-@login_required
 def forecast_prophet():
-    """Get Prophet AI forecast data with automatic training"""
+    """Get Prophet AI forecast data with automatic training - no login required"""
     try:
         print("Generating Prophet forecast...")
         
@@ -935,39 +967,43 @@ def calculate_prophet_statistics(forecast_data):
     }
 
 @app.route("/nasa_data", methods=["GET"])
-@login_required
 def get_nasa_data():
-    """Get NASA solar data for reference"""
+    """Get NASA solar data for reference - no login required"""
     try:
-        # Get active configuration
-        active_config = SystemConfiguration.query.filter_by(
-            user_id=current_user.id, is_active=True
-        ).first()
-        
-        if not active_config:
-            return jsonify([])  # Return empty array if no active config
-        
-        config_data = json.loads(active_config.config_data)
-        location = config_data.get('location', {})
-        latitude = float(location.get('latitude', 28.6139))
-        longitude = float(location.get('longitude', 77.2090))
-        
-        # Try to fetch and cache weather data
-        weather_data_path = DATA_DIR / f"weather_{active_config.id}.csv"
-        
-        if not weather_data_path.exists():
-            try:
-                fetch_and_cache_weather(latitude, longitude, weather_data_path)
-            except Exception as e:
-                print(f"Error fetching weather data: {str(e)}")
-                return jsonify([])
-        
-        # Read weather data
-        import pandas as pd
-        data = pd.read_csv(weather_data_path)
-        result = data.tail(100).to_dict(orient="records")  # Return last 100 records
-        
-        return jsonify(result)
+        # Check if user is logged in
+        if current_user.is_authenticated:
+            # Get active configuration
+            active_config = SystemConfiguration.query.filter_by(
+                user_id=current_user.id, is_active=True
+            ).first()
+            
+            if not active_config:
+                return jsonify([])  # Return empty array if no active config
+            
+            config_data = json.loads(active_config.config_data)
+            location = config_data.get('location', {})
+            latitude = float(location.get('latitude', 28.6139))
+            longitude = float(location.get('longitude', 77.2090))
+            
+            # Try to fetch and cache weather data
+            weather_data_path = DATA_DIR / f"weather_{active_config.id}.csv"
+            
+            if not weather_data_path.exists():
+                try:
+                    fetch_and_cache_weather(latitude, longitude, weather_data_path)
+                except Exception as e:
+                    print(f"Error fetching weather data: {str(e)}")
+                    return jsonify([])
+            
+            # Read weather data
+            import pandas as pd
+            data = pd.read_csv(weather_data_path)
+            result = data.tail(100).to_dict(orient="records")  # Return last 100 records
+            
+            return jsonify(result)
+        else:
+            # For guest users, return empty array (frontend will use demo data)
+            return jsonify([])
         
     except Exception as e:
         print(f"Error loading NASA data: {str(e)}")

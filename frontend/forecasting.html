@@ -400,6 +400,7 @@
 
   <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
 
+<script src="local-storage.js"></script>
 <script>
   let modelStatus = { trained: false };
   let forecast = null;
@@ -423,6 +424,20 @@
 
   async function loadForecastData(){
     try {
+      // Check if guest user and load localStorage data first
+      if (isGuestUser()) {
+        const localForecast = getForecastData();
+        if (localForecast) {
+          forecast = localForecast.forecast || localForecast;
+          stats = localForecast.statistics || {};
+          renderChart();
+          renderStats();
+          renderTable();
+          console.log('Local forecast data loaded successfully');
+          return;
+        }
+      }
+      
       console.log('Loading forecast data from Prophet API...');
       const res = await fetch('/forecast/generate', { method: 'POST' });
       const data = await res.json();
@@ -431,6 +446,12 @@
       if(data.status === 'success' && data.forecast && data.forecast.length > 0){
         forecast = data.forecast;
         stats = data.statistics || {};
+        
+        // Save to localStorage for guest users
+        if (isGuestUser()) {
+          setForecastData(data);
+        }
+        
         renderChart();
         renderStats();
         renderTable();
@@ -656,6 +677,10 @@
   }
 
   async function logout(){
+    // Clear localStorage data
+    clearAllData();
+    
+    // Call backend logout
     await fetch('/logout', { method: 'POST' });
     window.location.href = '/';
   }

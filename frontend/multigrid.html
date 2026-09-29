@@ -288,6 +288,7 @@
 
   <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
 
+<script src="local-storage.js"></script>
 <script>
   let allConfigs = [];
   let selected = new Set();
@@ -470,6 +471,10 @@
   }
 
   async function logout(){
+    // Clear localStorage data
+    clearAllData();
+    
+    // Call backend logout
     await fetch('/logout', {method:'POST'});
     window.location.href = '/';
   }

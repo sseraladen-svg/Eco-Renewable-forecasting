@@ -258,6 +258,15 @@
   .submit-btn:hover{background:#F0A263;}
   .submit-btn:active{transform:scale(0.99);}
   .submit-btn:disabled{opacity:0.6;cursor:not-allowed;}
+  .submit-btn.guest-btn{
+    background:transparent;
+    border:1px solid var(--copper);
+    color:var(--copper);
+    margin-top:12px;
+  }
+  .submit-btn.guest-btn:hover{
+    background:rgba(232,147,74,0.1);
+  }
 
   .spinner{
     width:15px;height:15px;
@@ -397,14 +406,39 @@
         </button>
       </form>
 
+      <div style="margin-top: 20px; text-align: center;">
+        <button type="button" class="submit-btn guest-btn" id="guestBtn" onclick="continueAsGuest()">
+          <span class="btn-label">Continue as Guest</span>
+        </button>
+        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+          No account needed • Data stored locally in browser
+        </p>
+      </div>
+
       <p class="foot-note" id="footNote">
         New here? <a href="#" onclick="setMode('register');return false;" style="color:#E8934A;font-weight:600;">Create an account</a>
       </p>
     </div>
   </div>
 
+<script src="local-storage.js"></script>
 <script>
   let mode = 'signin';
+
+  function continueAsGuest() {
+    // Set user mode to guest
+    setUserMode('guest');
+    
+    // Set guest user data
+    setUserData({
+      name: 'Guest User',
+      email: 'guest@local',
+      isGuest: true
+    });
+    
+    // Redirect to setup page
+    window.location.href = '/setup';
+  }
 
   function setMode(next){
     mode = next;
@@ -486,6 +520,17 @@
         btn.classList.remove('loading');
         btn.disabled = false;
         return;
+      }
+
+      // Set user mode to logged_in
+      setUserMode('logged_in');
+      
+      // Store user data in localStorage
+      if (data.user) {
+        setUserData({
+          ...data.user,
+          isGuest: false
+        });
       }
 
       window.location.href = data.redirect || '/dashboard';

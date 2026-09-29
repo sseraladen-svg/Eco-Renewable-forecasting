@@ -25,6 +25,7 @@
   body{
     font-family:'Inter',sans-serif;background:var(--bg-deep);color:var(--text);
     min-height:100vh;-webkit-font-smoothing:antialiased;
+    padding-top: 80px; /* Account for fixed navigation */
   }
   .wrap{max-width:640px;margin:0 auto;padding:48px 24px 100px;}
 
@@ -136,6 +137,9 @@
 </style>
 </head>
 <body>
+<!-- Include navigation -->
+<div id="navigation-container"></div>
+
 <div class="wrap">
   <div class="brand">
     <div class="brand-mark">E</div>
@@ -382,9 +386,65 @@
 
 <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
 
+<script src="local-storage.js"></script>
 <script>
   const TOTAL_STEPS = 5;
   const stepNames = { 1:'sn1', 2:'sn2', 3:'sn3', 4:'sn4', 5:'sn5' };
+
+  // Load existing configuration from localStorage for guest users
+  function loadExistingConfig() {
+    if (isGuestUser()) {
+      const existingConfig = getSystemConfig();
+      if (existingConfig) {
+        // Populate form fields with existing data
+        if (existingConfig.location) {
+          document.getElementById('latitude').value = existingConfig.location.latitude || 28.6139;
+          document.getElementById('longitude').value = existingConfig.location.longitude || 77.2090;
+          document.getElementById('altitude').value = existingConfig.location.altitude || 216;
+          document.getElementById('installation_type').value = existingConfig.location.installation_type || 'rooftop';
+          document.getElementById('terrain_type').value = existingConfig.location.terrain_type || 'urban';
+        }
+        if (existingConfig.solar) {
+          document.getElementById('panel_model').value = existingConfig.solar.panel_model || 'Jinko 550W';
+          document.getElementById('panel_count').value = existingConfig.solar.panel_count || 20;
+          document.getElementById('panel_power').value = existingConfig.solar.panel_power || 550;
+          document.getElementById('panel_efficiency').value = existingConfig.solar.panel_efficiency || 20;
+          document.getElementById('tilt_angle').value = existingConfig.solar.tilt_angle || 25;
+          document.getElementById('azimuth_angle').value = existingConfig.solar.azimuth_angle || 180;
+          document.getElementById('solar_installation_type').value = existingConfig.solar.installation_type || 'fixed';
+          document.getElementById('inverter_efficiency').value = existingConfig.solar.inverter_efficiency || 96;
+          document.getElementById('system_loss').value = existingConfig.solar.system_loss || 10;
+          document.getElementById('shading_factor').value = existingConfig.solar.shading_factor || 5;
+        }
+        if (existingConfig.wind) {
+          document.getElementById('turbine_model').value = existingConfig.wind.turbine_model || 'Vestas V136';
+          document.getElementById('turbine_count').value = existingConfig.wind.turbine_count || 2;
+          document.getElementById('rated_power').value = existingConfig.wind.rated_power || 5000;
+          document.getElementById('cut_in_speed').value = existingConfig.wind.cut_in_speed || 3;
+          document.getElementById('cut_out_speed').value = existingConfig.wind.cut_out_speed || 25;
+          document.getElementById('hub_height').value = existingConfig.wind.hub_height || 80;
+          document.getElementById('rotor_diameter').value = existingConfig.wind.rotor_diameter || 136;
+          document.getElementById('turbine_efficiency').value = existingConfig.wind.turbine_efficiency || 35;
+        }
+        if (existingConfig.battery) {
+          document.getElementById('battery_capacity').value = existingConfig.battery.battery_capacity || 100;
+          document.getElementById('battery_voltage').value = existingConfig.battery.battery_voltage || 48;
+          document.getElementById('charge_efficiency').value = existingConfig.battery.charge_efficiency || 95;
+          document.getElementById('discharge_efficiency').value = existingConfig.battery.discharge_efficiency || 95;
+          document.getElementById('max_discharge_rate').value = existingConfig.battery.max_discharge_rate || 50;
+        }
+        if (existingConfig.consumption) {
+          document.getElementById('daily_energy_usage').value = existingConfig.consumption.daily_energy_usage || 30;
+          document.getElementById('peak_load').value = existingConfig.consumption.peak_load || 10;
+          document.getElementById('critical_load').value = existingConfig.consumption.critical_load || 3;
+          document.getElementById('load_profile_type').value = existingConfig.consumption.load_profile_type || 'residential';
+        }
+      }
+    }
+  }
+
+  // Load existing config on page load
+  document.addEventListener('DOMContentLoaded', loadExistingConfig);
 
   function nextStep(target){
     if(target < 1 || target > TOTAL_STEPS) return;
@@ -478,11 +538,18 @@
     btn.disabled = true;
     document.getElementById('submitLabel').textContent = 'Saving…';
 
+    const config = collectConfig();
+
+    // Save to localStorage for guest users
+    if (isGuestUser()) {
+      setSystemConfig(config);
+    }
+
     try{
       const res = await fetch('/submit_setup', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(collectConfig())
+        body: JSON.stringify(config)
       });
       const data = await res.json();
 
@@ -513,6 +580,20 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
   }
+
+  // Load navigation component
+  async function loadNavigation() {
+    try {
+      const response = await fetch('/navigation.html');
+      const navHtml = await response.text();
+      document.getElementById('navigation-container').innerHTML = navHtml;
+    } catch (error) {
+      console.error('Failed to load navigation:', error);
+    }
+  }
+
+  // Load navigation on page load
+  document.addEventListener('DOMContentLoaded', loadNavigation);
 </script>
 </body>
 </html>

@@ -462,6 +462,7 @@
 
   <div class="toast" id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
 
+<script src="local-storage.js"></script>
 <script>
   let allConfigs = [];
   let activeConfig = null;
@@ -497,6 +498,25 @@
       document.getElementById('loadingState').style.display = 'none';
       document.getElementById('dashboardContent').style.display = 'block';
       
+      // Check if guest user and load localStorage data
+      if (isGuestUser()) {
+        const localConfig = getSystemConfig();
+        const localForecast = getForecastData();
+        
+        if (localConfig) {
+          activeConfig = {
+            id: 1,
+            name: 'Local Configuration',
+            config_data: localConfig
+          };
+          allConfigs = [activeConfig];
+        }
+        
+        if (localForecast) {
+          physicsForecast = localForecast;
+        }
+      }
+      
       // Get forecast data directly from API
       const forecastRes = await fetch('/forecast');
       console.log('Forecast response status:', forecastRes.status);
@@ -509,21 +529,32 @@
       const statusData = await statusRes.json();
       console.log('Status data:', statusData);
       
-      // Create sample config for demo
-      activeConfig = {
-        id: 1,
-        name: 'Demo Site',
-        config_data: {
-          location: { latitude: 28.6139, longitude: 77.2090 },
-          solar: { panel_count: 20, panel_power: 400 },
-          wind: { turbine_count: 2, rated_power: 5000 },
-          battery: { battery_capacity: 10 },
-          consumption: { daily_energy_usage: 30 }
+      // Use API data if localStorage data is not available
+      if (!physicsForecast && forecastData) {
+        physicsForecast = forecastData;
+        // Save to localStorage for guest users
+        if (isGuestUser()) {
+          setForecastData(forecastData);
         }
-      };
+      }
       
-      allConfigs = [activeConfig];
-      physicsForecast = forecastData;
+      // Create sample config for demo if no config exists
+      if (!activeConfig) {
+        activeConfig = {
+          id: 1,
+          name: 'Demo Site',
+          config_data: {
+            location: { latitude: 28.6139, longitude: 77.2090 },
+            solar: { panel_count: 20, panel_power: 400 },
+            wind: { turbine_count: 2, rated_power: 5000 },
+            battery: { battery_capacity: 10 },
+            consumption: { daily_energy_usage: 30 }
+          }
+        };
+        
+        allConfigs = [activeConfig];
+      }
+      
       modelStatus = statusData.model || { trained: false };
       
       renderSiteSwitcher();
@@ -850,6 +881,10 @@
   }
 
   async function logout(){
+    // Clear localStorage data
+    clearAllData();
+    
+    // Call backend logout
     await fetch('/logout', {method:'POST'});
     window.location.href = '/';
   }
