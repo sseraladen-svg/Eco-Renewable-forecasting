@@ -25,7 +25,6 @@
   body{
     font-family:'Inter',sans-serif;background:var(--bg-deep);color:var(--text);
     min-height:100vh;-webkit-font-smoothing:antialiased;
-    padding-top: 80px; /* Account for fixed navigation */
   }
   .wrap{max-width:640px;margin:0 auto;padding:48px 24px 100px;}
 
@@ -137,9 +136,6 @@
 </style>
 </head>
 <body>
-<!-- Include navigation -->
-<div id="navigation-container"></div>
-
 <div class="wrap">
   <div class="brand">
     <div class="brand-mark">E</div>
@@ -580,20 +576,6 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
   }
-
-  // Load navigation component
-  async function loadNavigation() {
-    try {
-      const response = await fetch('/navigation.html');
-      const navHtml = await response.text();
-      document.getElementById('navigation-container').innerHTML = navHtml;
-    } catch (error) {
-      console.error('Failed to load navigation:', error);
-    }
-  }
-
-  // Load navigation on page load
-  document.addEventListener('DOMContentLoaded', loadNavigation);
 </script>
 </body>
 </html>
