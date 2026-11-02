@@ -1,4 +1,4 @@
-# EcoGrid AI
+# Eco-Renewable-forecasting AI
 ### ⚡ Renewable Energy Forecasting & Management Platform
 
 <div align="center">
